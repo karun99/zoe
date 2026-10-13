@@ -21,7 +21,7 @@ classifiers = [
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
-llm = ["llama-cpp-python>=0.2.0"]
+llm = ["llama-cpp-python>=0.3.36"]
 flybrain = ["flybrain"]
 companion = ["mss", "pytesseract"]
 api = ["fastapi", "uvicorn"]
