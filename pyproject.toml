@@ -25,7 +25,7 @@ llm = ["llama-cpp-python>=0.2.0"]
 flybrain = ["flybrain"]
 companion = ["mss", "pytesseract"]
 api = ["fastapi", "uvicorn"]
-dev = ["pytest>=7.0", "pytest-cov"]
+dev = ["pytest>=9.1.1", "pytest-cov"]
 
 [project.scripts]
 zoe = "zoe.cli:main"
