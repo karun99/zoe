@@ -29,6 +29,7 @@ dev = ["pytest>=7.0", "pytest-cov"]
 
 [project.scripts]
 zoe = "zoe.cli:main"
+zoe-mcp = "zoe.mcp_server:main"
 
 [tool.setuptools.packages.find]
 include = ["zoe*"]

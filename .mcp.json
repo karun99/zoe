@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcp-spec/main/schemas/client.json",
+  "name": "zoe",
+  "description": "MCP server for Project Zoe - a connectome-based reservoir computing companion (run, report, layers, identity)",
+  "mcpServers": {
+    "zoe-mcp": {
+      "command": "zoe-mcp"
+    },
+    "glama-gateway": {
+      "command": "glama-mcp",
+      "args": [],
+      "env": {
+        "GLAMA_API_KEY": "${GLAMA_API_KEY}",
+        "GLAMA_DEFAULT_MODEL": "openai/gpt-4o"
+      }
+    }
+  }
+}

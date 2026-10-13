@@ -1,5 +1,7 @@
 # Project Zoe — ζωή <sub>(“life”)</sub>
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/karun99/zoe)](https://m8ven.ai/mcp/karun99/zoe?s=readme)
+
 **A connectome-based reservoir computing companion** with biologically-inspired
 control layers, an evolving LoRA adapter, embodied through a virtual avatar,
 sandboxed in a MicroVM, with companion mode.
@@ -116,6 +118,30 @@ GROWTH phase. Mutation rate follows the temporal noise-reduction law
 so evolution is a *real* hill-climb: accuracy rises from `~0.31` to `~0.56`
 over 200 generations on the mock rig.
 
+## MCP server
+
+Zoe ships its **own Model Context Protocol server** (L5), so an editor or another
+agent can drive the rig. It speaks newline-delimited JSON-RPC over **stdio**
+(`initialize` / `tools/list` / `tools/call`, `resources/list` / `resources/read`),
+is dependency-free, and exposes four tools plus an identity resource:
+
+| Tool | Purpose |
+|---|---|
+| `zoe_run` | Run one 13-step interaction; returns her answer, routed agent and growth signal |
+| `zoe_report` | Run the evolution loop + 7-tier evaluation; returns the pass/fail summary |
+| `zoe_layers` | List the eleven layers and their roles |
+| `zoe_identity` | Return Zoe's persistent identity card |
+
+```bash
+zoe-mcp                      # or: python -m zoe.mcp_server
+```
+
+It is registered per-project through a committed [`.mcp.json`](.mcp.json) —
+alongside the shared **`glama-gateway`** server that fronts the
+[Glama AI gateway](https://glama.ai) (`https://gateway.glama.ai/v1`,
+OpenAI-compatible, 100+ models). Zoe is listed on the **M8ven Trust Index** as a
+verified publisher (badge above).
+
 ## Requirements coverage
 
 Every functional requirement in the SRS has a corresponding implementation and
@@ -141,9 +167,10 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-63 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
-cycle, Dunce patching, MCP/Prompt API, VM isolation & egress, companion
-redaction, the 7-tier evaluation harness, and the integrated rig.
+76 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
+cycle, Dunce patching, MCP client + server (stdio JSON-RPC), the Prompt API,
+VM isolation & egress, companion redaction, the 7-tier evaluation harness, and
+the integrated rig.
 
 ## Known limitations
 
