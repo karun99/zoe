@@ -30,6 +30,8 @@ def test_report_structure(cfg):
     assert "evaluation" in report
     assert report["summary"]["scored"] > 0
     assert isinstance(report["premortem"], list)
+    assert report["signals"]["peak_memory_mb"] >= 0.0
+    assert "M-1.4" in {r.id for r in report["evaluation"].results}
 
 
 def test_companion_mode_integration(cfg):

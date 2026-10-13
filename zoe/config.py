@@ -102,6 +102,8 @@ class ZoeConfig:
     # --- Ledger / metrics ----------------------------------------------------
     ledger_path: str = ".kali-ledger/ledger.jsonl"
     eval_held_out: int = 32
+    memory_ceiling_mb: int = 1536  # premortem §7: alert above 1.5 GB
+    task_accuracy_floor: float = 0.40  # premortem §3: above-chance floor
 
     def to_dict(self) -> Dict[str, Any]:
         return {f.name: getattr(self, f.name) for f in fields(self)}

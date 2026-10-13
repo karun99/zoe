@@ -57,6 +57,8 @@ def _rising(signals: Dict) -> Optional[Number]:
 _T1 = [
     MetricSpec("M-1.2", 1, "Inference latency p50", "<500 ms", "2 s",
                lambda s: s.get("latency_ms_p50"), _le(500)),
+    MetricSpec("M-1.4", 1, "Memory ceiling", "<1536 MB", "2 GB",
+               lambda s: s.get("peak_memory_mb"), _le(1536)),
     MetricSpec("M-1.6", 1, "Flybrain step time", "<50 ms", "500 ms",
                lambda s: s.get("flybrain_step_ms"), _le(50)),
     MetricSpec("M-1.7", 1, "Prompt cache hit rate", "70%", "<30%",
@@ -194,20 +196,58 @@ def evaluate(signals: Dict) -> Evaluation:
 
 
 def premortem(signals: Dict) -> List[str]:
-    """Return human-readable premortem warnings (SRS section 10.1)."""
+    """Return human-readable premortem warnings (SRS section 10.1).
+
+    Each detector maps to a failure mode from the project premortem (see the
+    README "Premortem guardrails" table); the ``[§n]`` tag is the failure-mode
+    id, so a warning tells you *which* way the project is failing.
+    """
     warnings: List[str] = []
     hist = signals.get("accuracy_history", [])
     if len(hist) >= 2 and hist[-1] < hist[0]:
-        warnings.append("Overfitting / accuracy regression (M-2.1 down)")
+        warnings.append("[§6] Overfitting / accuracy regression (M-2.1 down)")
     if signals.get("retention", 1.0) < 0.5:
-        warnings.append("Catastrophic forgetting (M-2.5 < 50%)")
+        warnings.append("[§6] Catastrophic forgetting (M-2.5 < 50%)")
+
+    # §1 — no evaluation harness: accuracy was never measured on held-out data
+    acc = signals.get("task_accuracy")
+    if acc is None:
+        warnings.append("[§1] No evaluation harness: task accuracy unmeasured")
+
+    # §3 — no real task: accuracy sits at or below chance
+    if acc is not None and acc < 0.40:
+        warnings.append(f"[§3] No real task: accuracy {acc:.2f} near chance (M-2.9)")
+
+    # §4 — no convergence: the mutation rate never decayed
     mu = signals.get("final_mu")
+    if mu is not None and mu >= 0.001:
+        warnings.append(f"[§4] No convergence: mu {mu:.4f} not below 0.001 (M-4.1)")
     if mu is not None and mu < 0.001 and not signals.get("accuracy_improved"):
-        warnings.append("Sterility: mutations stopped without improvement")
+        warnings.append("[§4] Sterility: mutations stopped without improvement")
+
+    # §2 — evolution stalled: no accuracy gain across the run
+    if len(hist) >= 2 and hist[-1] <= hist[0]:
+        warnings.append("[§2] Evolution stalled: no accuracy gain over the run")
+
+    # §6 — overfitting: generalization gap too wide
+    gap = signals.get("generalization_gap")
+    if gap is not None and gap > 0.10:
+        warnings.append(f"[§6] Overfitting: generalization gap {gap:.2f} > 10% (M-2.4)")
+
+    # §7 — memory ceiling
+    mem = signals.get("peak_memory_mb")
+    if mem is not None and mem > 1536:
+        warnings.append(f"[§7] Memory ceiling: {mem:.0f} MB > 1536 MB (M-1.4)")
+
+    # §9 — avatar desync
+    lip = signals.get("lip_sync_ms")
+    if lip is not None and lip > 100:
+        warnings.append(f"[§9] Avatar desync: lip-sync {lip:.0f} ms > 100 ms (M-6.4)")
+
     if signals.get("cancer_detection") is not None and signals["cancer_detection"] < 1.0:
         warnings.append("Cancer: lineage growth missed (M-4.3)")
     if not signals.get("vm_isolation_ok", True):
-        warnings.append("VM escape: isolation break (M-5.7)")
+        warnings.append("[§10] VM escape: isolation break (M-5.7)")
     if signals.get("silent_thinking_violations", 0) > 0:
         warnings.append("Silent Thinking leak (M-2.8)")
     return warnings

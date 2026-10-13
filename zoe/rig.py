@@ -7,6 +7,8 @@ evolution loop through Kali/Dunce, and exposes benchmark signals for the
 
 from __future__ import annotations
 
+import resource
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -290,6 +292,8 @@ class ZoeRig:
                 "vm_boot_s": self._vm_handle.boot_time_s,
                 "accuracy_history": self._accuracy_history or [held_acc],
                 "generalization_gap": abs(train_acc - held_acc),
+                "task_accuracy": held_acc,
+                "peak_memory_mb": _peak_memory_mb(),
                 "format_compliance": 1.0 if len(result.output_lines) == self.cfg.output_lines else 0.0,
                 "silent_thinking_violations": self.ledger.count("jataka.block"),
                 "routing_accuracy": self.benchmark_routing(),
@@ -340,3 +344,17 @@ class ZoeRig:
 
 def _safe_ratio(num: int, denom: int) -> float:
     return float(num) / float(denom) if denom else 0.0
+
+
+def _peak_memory_mb() -> float:
+    """Peak resident set size of the process, in MB (premortem §7 / M-1.4).
+
+    ``ru_maxrss`` is reported in kilobytes on Linux and bytes on macOS; the
+    scaling below normalises both to MB. Returns 0.0 if unavailable."""
+    try:
+        raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    except Exception:  # pragma: no cover - platform without resource
+        return 0.0
+    if sys.platform == "darwin":  # pragma: no cover - macOS reports bytes
+        return raw / (1024.0 * 1024.0)
+    return raw / 1024.0

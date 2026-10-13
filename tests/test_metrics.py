@@ -29,6 +29,9 @@ GOOD_SIGNALS = {
     "mcp_success_rate": 0.9,
     "deadlocks": 0,
     "retention": 0.95,
+    "peak_memory_mb": 300,
+    "task_accuracy": 0.6,
+    "accuracy_improved": True,
 }
 
 
@@ -70,3 +73,51 @@ def test_premortem_flags_regression():
 
 def test_critical_five_defined():
     assert len(CRITICAL_FIVE) == 5
+
+
+def test_memory_ceiling_metric():
+    over = evaluate({"peak_memory_mb": 2048})
+    m14 = [r for r in over.results if r.id == "M-1.4"][0]
+    assert m14.ok is False
+    under = evaluate({"peak_memory_mb": 300})
+    assert [r for r in under.results if r.id == "M-1.4"][0].ok is True
+
+
+def test_premortem_flags_no_real_task():
+    signals = dict(GOOD_SIGNALS)
+    signals["task_accuracy"] = 0.2
+    assert any("No real task" in w for w in premortem(signals))
+
+
+def test_premortem_flags_no_convergence():
+    signals = dict(GOOD_SIGNALS)
+    signals["final_mu"] = 0.05
+    assert any("No convergence" in w for w in premortem(signals))
+
+
+def test_premortem_flags_memory_ceiling():
+    signals = dict(GOOD_SIGNALS)
+    signals["peak_memory_mb"] = 2048
+    assert any("Memory ceiling" in w for w in premortem(signals))
+
+
+def test_premortem_flags_avatar_desync():
+    signals = dict(GOOD_SIGNALS)
+    signals["lip_sync_ms"] = 250
+    assert any("Avatar desync" in w for w in premortem(signals))
+
+
+def test_premortem_flags_stalled_evolution():
+    signals = dict(GOOD_SIGNALS)
+    signals["accuracy_history"] = [0.5, 0.5, 0.5]
+    assert any("Evolution stalled" in w for w in premortem(signals))
+
+
+def test_premortem_flags_overfitting_gap():
+    signals = dict(GOOD_SIGNALS)
+    signals["generalization_gap"] = 0.25
+    assert any("Overfitting: generalization" in w for w in premortem(signals))
+
+
+def test_premortem_clean_on_good_signals():
+    assert premortem(GOOD_SIGNALS) == []

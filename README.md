@@ -59,13 +59,13 @@ Ready for the next step whenever you are.
 agent=YELLOW growth=0.500 mutated=False frames=31
 ```
 
-`python -m zoe report` on the mock rig currently passes **25 of 26** scored
+`python -m zoe report` on the mock rig currently passes **26 of 27** scored
 metrics across all 7 tiers and all **Critical Five** checks:
 
 ```console
 === Zoe 7-tier evaluation ===
-scored=26 passed=25 pass_rate=0.962 critical_five_ok=True
-  tier1: 5/5   tier2: 4/4   tier3: 3/3   tier4: 2/3
+scored=27 passed=26 pass_rate=0.963 critical_five_ok=True
+  tier1: 6/6   tier2: 4/4   tier3: 3/3   tier4: 2/3
   tier5: 4/4   tier6: 3/3   tier7: 4/4
 ```
 
@@ -167,10 +167,35 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-76 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
+84 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
 cycle, Dunce patching, MCP client + server (stdio JSON-RPC), the Prompt API,
-VM isolation & egress, companion redaction, the 7-tier evaluation harness, and
-the integrated rig.
+VM isolation & egress, companion redaction, the 7-tier evaluation harness, the
+premortem detectors, and the integrated rig.
+
+## Premortem guardrails
+
+Zoe is evaluated against a written **premortem** (assume-failure / work-backward).
+Each failure mode has a code-level detector or mitigation, surfaced by the
+7-tier harness and by `premortem(signals)` in `zoe.metrics`:
+
+| # | Failure mode | Guardrail | Signal / metric |
+|--:|---|---|---|
+| 1 | No evaluation harness | 7-tier harness runs every `report`; held-out accuracy is always measured | M-2.1, §1 detector |
+| 2 | Evolution slower than SFT | Documented trade-off; elitist selector keeps the best adapter; μ decays | M-2.1 trend, §2 detector |
+| 3 | No real task | Hidden ground-truth task (real hill-climb); accuracy floor | M-2.9, §3 detector |
+| 4 | No convergence | Temporal noise-reduction law `μ = μ₀·e^(−λt)·(1−A)`; elitism | M-4.1, §4 detector |
+| 5 | LoRA won't attach to GGUF | Frozen base + in-process adapter; mock/prompt-evolution fallback | L3 mock mode |
+| 6 | Overfitting | Train/held-out split; generalization-gap gate | M-2.4, §6 detector |
+| 7 | Memory exceeds 2 GB | Peak-RSS monitor with 1.5 GB ceiling | M-1.4, §7 detector |
+| 8 | GGUF version lock-in | Pin `ZOE_GGUF_PATH` + adapter hash; upgrade path documented | L3 config |
+| 9 | Avatar desync | Lip-sync latency budget | M-6.4, §9 detector |
+| 10 | VM escape | VM isolation check + egress allowlist (deny-by-default) | M-5.7, M-5.8 |
+| 11 | Audit false negative | Jataka guardrails (L10) + Bio-Audit Jataka in the profile repo | M-5.1 |
+| 12 | Soul drift undetected | Sahaja witness (L9) + Bio-Audit Soul | M-6.6 |
+| 13 | Kill switch failure | Bio-Audit Dunce circuit breaker + `automation_lock` (profile repo) | Bio-Audit |
+
+`python -m zoe report` prints the active premortem warnings, so a regression in
+any of these shows up as a tagged `[§n]` line rather than a silent failure.
 
 ## Known limitations
 
