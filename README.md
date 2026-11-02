@@ -22,7 +22,7 @@ without a GPU, a GGUF model, KVM, or a display.
 ```
 L1  Flybrain Reservoir    → pattern detection (LIF; frozen)
 L2  Prompt-as-Harness     → routing + 5-line output + growth signal
-L3  llama.cpp + LoRA      → generation (frozen base, evolving adapter)
+L3  Frozen base + LoRA     → generation (ollama · llama.cpp · mock)
 L4  Kali + Dunce          → temporal gates (WHEN) + failure patching
 L5  MCP + Prompt API      → tools + versioned, cached prompts
 L6  Virtual Avatar        → embodied expression + lip-sync
@@ -40,11 +40,47 @@ git clone https://github.com/karun99/zoe.git
 cd zoe
 pip install -e .            # core needs only numpy
 
+python -m zoe doctor        # which engine can serve Zoe here?
 python -m zoe demo          # short scripted demonstration
 python -m zoe run "build and implement a plan to fix the code"
 python -m zoe train --generations 200
 python -m zoe report        # evolution + 7-tier evaluation
 ```
+
+### With a real local model
+
+The base model is pluggable: **Ollama**, **llama.cpp** (`llama-server`,
+`llama-cpp-python` or `llama-cli`), or the deterministic mock.
+
+```bash
+# Ollama (simplest)
+ollama serve &
+ollama pull qwen2.5:0.5b
+ZOE_LLM_BACKEND=ollama ZOE_OLLAMA_MODEL=qwen2.5:0.5b python -m zoe run "plan my day"
+
+# llama.cpp server
+ZOE_LLM_BACKEND=llama-server python -m zoe run "plan my day"
+
+# pick the first engine that answers
+ZOE_LLM_BACKEND=auto python -m zoe doctor
+```
+
+`zoe backends` lists every engine and whether it is installed; `zoe doctor`
+checks the whole environment (Python, numpy, engines, models, ledger, RAM). If a
+real engine dies mid-run, Zoe answers from mock and marks the result
+`degraded=true` rather than pretending.
+
+### On a phone (Termux)
+
+```bash
+pkg install git -y && git clone https://github.com/karun99/zoe.git && cd zoe
+bash scripts/termux-install.sh      # python-numpy + Ollama + qwen2.5:0.5b
+source ~/.zoe/env
+zoe run "build and implement a plan"
+```
+
+See [`docs/TERMUX.md`](docs/TERMUX.md) for model sizes, wake locks, MCP setup on
+Android, and troubleshooting.
 
 Example:
 
@@ -118,6 +154,25 @@ GROWTH phase. Mutation rate follows the temporal noise-reduction law
 so evolution is a *real* hill-climb: accuracy rises from `~0.31` to `~0.56`
 over 200 generations on the mock rig.
 
+The engine underneath is a deployment choice, not an architectural one
+(`zoe/backends.py`):
+
+| `ZOE_LLM_BACKEND` | transport | typical host |
+|---|---|---|
+| `ollama` | HTTP `/api/chat` | laptop, Termux |
+| `llama-server` | HTTP `/v1/chat/completions` | laptop, Termux |
+| `llamacpp` | in-process `llama-cpp-python` | laptop / server |
+| `llama-cli` | subprocess `llama-cli` | Termux, no compiler |
+| `mock` | deterministic, no model | any, default |
+| `auto` | first engine that answers | any |
+
+**Honest note on the adapter.** A frozen model inside another process cannot
+have LoRA weights merged into it, so on a real engine the adapter acts as a
+*controller*: its winning salience lane and activation intensity set the
+temperature and tone directive for each call (`LlamaCppModel.steer`). Accuracy
+and loss are still measured on the adapter's own probe, so the evolution loop
+measures exactly what it did before. It is a controller, not a weight merge.
+
 ## MCP server
 
 Zoe ships its **own Model Context Protocol server** (L5), so an editor or another
@@ -155,6 +210,8 @@ All knobs are `ZOE_*` environment variables (NFR-4.2):
 ```bash
 ZOE_NEURON_COUNT=139000 ZOE_GGUF_PATH=/models/qwen.gguf python -m zoe run "hello"
 ZOE_MOCK_MODE=true python -m zoe report
+ZOE_LLM_BACKEND=ollama ZOE_OLLAMA_MODEL=qwen2.5:0.5b python -m zoe run "hello"
+ZOE_LLM_BACKEND=llama-cli ZOE_GGUF_PATH=~/models/tiny.gguf python -m zoe run "hello"
 ```
 
 Dynamic `*_allowlist` / `mcp_servers` fields are set in code
@@ -167,10 +224,11 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-84 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
+103 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
 cycle, Dunce patching, MCP client + server (stdio JSON-RPC), the Prompt API,
 VM isolation & egress, companion redaction, the 7-tier evaluation harness, the
-premortem detectors, and the integrated rig.
+inference backends (Ollama, llama-server, llama-cli, mock fallback) against a
+local stub server, `zoe doctor`, the premortem detectors, and the integrated rig.
 
 ## Premortem guardrails
 
@@ -204,9 +262,15 @@ any of these shows up as a tagged `[§n]` line rather than a silent failure.
   the model, but a production system would use a guided mutation proposal
   (e.g. SPSA) to bring this under 20%. Documented honestly rather than tuned
   away.
-* **Mock LLM / reservoir.** L1 uses a synthetic LIF reservoir and L3 a mock
-  generator by default. Point `ZOE_GGUF_PATH` at a real GGUF with
-  `llama-cpp-python` installed to use a real base model.
+* **Mock LLM / reservoir by default.** L1 uses a synthetic LIF reservoir and L3
+  defaults to the deterministic mock. Set `ZOE_LLM_BACKEND=ollama` (or
+  `llama-server` / `llamacpp` / `llama-cli`) for a real base model.
+* **Adapter is a controller, not merged weights.** Over HTTP the frozen GGUF
+  cannot absorb the evolved LoRA, so the adapter steers sampling instead of
+  changing weights (see *Layer 3*).
+* **Termux parity.** On Android, L7 stays on `MockVM` (no KVM) and L8 screen
+  capture needs `mss`/`pytesseract`, which are not available. Everything else —
+  L1–L6, L9–L11 — runs identically. See [`docs/TERMUX.md`](docs/TERMUX.md).
 * **Conceptual layers.** L9/L11 and the “+ peripheral awareness” and
   “+ thought blend” mechanisms are implemented as control logic, in line with
   the SRS scope table.

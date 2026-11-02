@@ -29,8 +29,9 @@ truth for every consequential decision.
 └─────────────────────────┬───────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│         LLAMA.CPP + EVOLVED LoRA (L3)                       │
-│         frozen GGUF  +  mutating low-rank adapter           │
+│         FROZEN BASE MODEL + EVOLVED LoRA (L3)               │
+│  frozen GGUF  +  mutating low-rank adapter                  │
+│ engines: ollama · llama-server · llamacpp · llama-cli · mock│
 └─────────────────────────┬───────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -71,7 +72,9 @@ truth for every consequential decision.
 | `zoe/layers/l11_pia.py` | `PIA` — silent adaptation |
 | `zoe/metrics/evaluation.py` | 7-tier metric specs + premortem detectors |
 | `zoe/rig.py` | `ZoeRig` — 13-step flow, evolution loop, benchmarks |
-| `zoe/cli.py` | `run` / `train` / `report` / `demo` |
+| `zoe/cli.py` | `run` / `train` / `report` / `demo` / `doctor` / `backends` |
+| `zoe/doctor.py` | environment diagnostics (`zoe doctor`) |
+| `zoe/backends.py` | Ollama / llama.cpp / mock engines behind one interface |
 
 ## Key data contracts
 

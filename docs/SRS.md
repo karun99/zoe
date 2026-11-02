@@ -23,7 +23,7 @@ AI Virtual Machine, and Companion Mode for screen/browser awareness.
 |---|---|---|
 | L1 | Flybrain Reservoir | 🟢 Real (validated) |
 | L2 | Prompt-as-Neural-Harness | 🟢 Real (deployable) |
-| L3 | llama.cpp + Evolved LoRA | 🟢 Real (buildable) |
+| L3 | Frozen base + Evolved LoRA (Ollama / llama.cpp) | 🟢 Real (buildable) |
 | L4 | Kali + Dunce | 🟢 Real (coded) |
 | L5 | MCP + Prompt API | 🟢 Real (working) |
 | L6 | Virtual Avatar | 🟢 Real (frameworks exist) |
@@ -135,7 +135,14 @@ relationships stable across sessions.
 | FR-2.9 | Sahaja records without acting | High |
 | FR-2.10 | Consistent identity | Critical |
 
-### 4.3 L3 llama.cpp + LoRA
+### 4.3 L3 frozen base model + LoRA
+
+The base model is frozen; only the low-rank adapter evolves. The engine that
+runs the base model is a deployment choice, not an architectural one: Ollama,
+llama.cpp (`llama-server`, `llama-cpp-python`, `llama-cli`) or the
+deterministic mock, all behind one interface (`zoe/backends.py`). FR-3.1's
+GGUF/mmap path is the in-process `llamacpp` backend; the other engines load the
+same GGUF in their own process.
 
 | Req | Requirement | Priority |
 |---|---|---|
@@ -226,7 +233,8 @@ States: idle · curious · focused · playful · resting.
 
 ## 5. External interfaces
 User (CLI, avatar UI, 5-line output, tray indicator) · hardware (CPU, RAM, GPU,
-camera/mic) · software (Python ≥3.10, llama-cpp-python, numpy, flybrain, mss,
+camera/mic) · software (Python ≥3.10, numpy, Ollama or llama.cpp
+(`llama-cpp-python` / `llama-server` / `llama-cli`), flybrain, mss,
 pytesseract, Firecracker) · communication (MCP stdio JSON-RPC, Prompt API
 HTTP/REST, avatar WebSocket, VM gRPC/REST).
 

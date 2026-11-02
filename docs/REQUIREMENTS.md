@@ -33,10 +33,10 @@ Every functional requirement in the SRS maps to an implementation and a test.
 
 | Req | Requirement | Code | Test |
 |---|---|---|---|
-| FR-3.1 | Load GGUF (mmap) | `LlamaCppModel` | mock-mode tests |
+| FR-3.1 | Load GGUF (mmap) | `LlamaCppModel` / `zoe.backends` | mock-mode tests, `test_l3_backends.py` |
 | FR-3.2 | Evolving LoRA (≥64-dim) | `adapter` | `test_report_structure` |
 | FR-3.3 | Mutate only when Kali permits | `mutate(permitted=…)` | covered by `train` |
-| FR-3.4 | Mock mode fallback | `mock` | `test_run_returns_five_lines` |
+| FR-3.4 | Mock mode fallback | `mock` / `llm_fallback_mock` | `test_auto_falls_through_to_mock_when_nothing_runs` |
 | FR-3.5 | Measure held-out accuracy | `measure_accuracy` | `test_train_runs_and_records_history` |
 | FR-3.6 | Temporal noise reduction | `temporal_noise` | `test_mu_decays_with_time` |
 

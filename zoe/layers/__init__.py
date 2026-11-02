@@ -1,5 +1,19 @@
 """Zoe's 11 layers + 2 mechanisms, one module per layer."""
 
+from ..backends import (
+    BackendError,
+    BackendReply,
+    BackendUnavailable,
+    LlamaCliBackend,
+    LlamaCppBackend,
+    LlamaServerBackend,
+    LLMBackend,
+    MockBackend,
+    OllamaBackend,
+    available_backends,
+    build_backend,
+    resolve_backend,
+)
 from .l1_flybrain import FlybrainReservoir, ReservoirReport
 from .l2_harness import HarnessDecision, PromptHarness
 from .l3_llm import Generation, LlamaCppModel
@@ -16,6 +30,9 @@ __all__ = [
     "FlybrainReservoir", "ReservoirReport",
     "PromptHarness", "HarnessDecision",
     "LlamaCppModel", "Generation",
+    "LLMBackend", "BackendReply", "BackendError", "BackendUnavailable",
+    "OllamaBackend", "LlamaServerBackend", "LlamaCppBackend", "LlamaCliBackend",
+    "MockBackend", "build_backend", "resolve_backend", "available_backends",
     "Kali", "KaliState", "Dunce",
     "MCPClient", "ToolSpec", "McpServerSpec", "PromptAPI",
     "Avatar", "Frame",

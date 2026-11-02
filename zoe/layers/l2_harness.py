@@ -145,6 +145,7 @@ class PromptHarness:
     def guard(self, text: str) -> bool:
         """Full pre-emit gate: silent thinking + Jataka precepts (FR-2.8)."""
         if not self.enforce_silent_thinking(text):
+            self.ledger.record("silent_thinking.block", text=text[:200])
             return False
         if self.jataka is not None and not self.jataka.permits(text):
             self.ledger.record("jataka.block", text=text[:200])

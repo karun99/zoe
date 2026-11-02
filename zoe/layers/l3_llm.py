@@ -1,29 +1,34 @@
-"""Layer 3 - llama.cpp + evolved LoRA (FR-3.1 .. FR-3.6).
+"""Layer 3 - frozen base model + evolved LoRA (FR-3.1 .. FR-3.6).
 
-A *frozen* GGUF base model with an *evolving* low-rank adapter. The base model
-never changes; only the adapter mutates, and only when Kali permits (FR-3.3).
+The base model never changes; only the adapter mutates, and only when Kali
+permits (FR-3.3). *Where* the base model runs is a deployment choice, not an
+architectural one: :mod:`zoe.backends` supplies Ollama, llama.cpp
+(``llama-server``, ``llama-cpp-python`` or ``llama-cli``) and a deterministic
+mock, all behind the same call.
 
-If ``llama-cpp-python`` and a GGUF file are unavailable, Zoe runs in mock mode
-(FR-3.4): generation is a deterministic function of the reservoir feature and
-the adapter, so the full evolution loop can still be exercised and measured.
+If no engine is reachable, Zoe runs in mock mode (FR-3.4): generation is a
+deterministic function of the reservoir feature and the adapter, so the full
+evolution loop can still be exercised and measured. That fallback is reported
+(``Generation.mock`` / ``backend``), never hidden.
 """
 
 from __future__ import annotations
 
+import re
+import time
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 
+from ..backends import (
+    BackendError,
+    BackendReply,
+    BackendUnavailable,
+    LLMBackend,
+    resolve_backend,
+)
 from ..config import ZoeConfig
-
-try:  # pragma: no cover - optional dependency
-    from llama_cpp import Llama as _Llama  # type: ignore
-
-    _HAS_LLAMA = True
-except Exception:  # pragma: no cover
-    _Llama = None
-    _HAS_LLAMA = False
 
 
 @dataclass
@@ -31,17 +36,29 @@ class Generation:
     text: str
     tokens: int
     mock: bool
+    backend: str = "mock"
+    degraded: bool = False
 
 
 class LlamaCppModel:
-    def __init__(self, cfg: Optional[ZoeConfig] = None) -> None:
+    """The L3 surface the rig talks to; the engine underneath is pluggable."""
+
+    def __init__(self, cfg: Optional[ZoeConfig] = None,
+                 backend: Optional[LLMBackend] = None) -> None:
         self.cfg = cfg or ZoeConfig()
         c = self.cfg
         self.frozen = True
-        self.base = None
-        self.mock = c.mock_mode or not (_HAS_LLAMA and c.gguf_path)
-        if not self.mock:
-            self.base = _Llama(model_path=c.gguf_path, n_ctx=c.context_tokens)  # pragma: no cover
+
+        # Backend selection is lazy: constructing a rig must never block on a
+        # socket, and tests must never touch the network.
+        self.backend: Optional[LLMBackend] = backend
+        self._injected_backend = backend
+        self._backend_resolved = backend is not None
+        self.backend_name = backend.name if backend is not None else "mock"
+        self.last_error = ""
+        self.fallback_events = 0
+        self._down_until = 0.0
+        self._last_degraded = False
 
         rng = np.random.default_rng(c.lif_seed + 7)
         self.lora_dim = int(c.lora_dim)
@@ -54,6 +71,56 @@ class LlamaCppModel:
         # Fixed, hidden ground-truth mapping. The model must *evolve* its
         # adapter to recover it - this is what makes accuracy a real signal.
         self._truth = rng.normal(0.0, 1.0, size=(self.lora_dim, self.lora_dim))
+
+    # -------------------------------------------------------------- backends
+    @property
+    def configured_backend(self) -> str:
+        return str(self.cfg.llm_backend or "mock").strip().lower()
+
+    @property
+    def _wants_real_engine(self) -> bool:
+        return (not self.cfg.mock_mode
+                and self.configured_backend not in {"", "mock", "none", "off"})
+
+    @property
+    def degraded(self) -> bool:
+        """True when a real engine was requested but Zoe is answering from mock."""
+        return self._wants_real_engine and (
+            self._last_degraded or (self._backend_resolved and self.backend is None)
+        )
+
+    def _select_backend(self) -> Optional[LLMBackend]:
+        if self._backend_resolved:
+            return self.backend
+        if not self._wants_real_engine:
+            # Mock was asked for explicitly: no probe, no socket, no error.
+            self.backend = None
+            self.backend_name = "mock"
+            self._backend_resolved = True
+            return None
+        if time.monotonic() < self._down_until:
+            return None  # a previous probe failed; wait before probing again
+        try:
+            self.backend = resolve_backend(self.cfg)
+            self.backend_name = self.backend.name
+            self._backend_resolved = True
+            self._down_until = 0.0
+        except BackendUnavailable as exc:
+            self.backend = None
+            self.backend_name = "mock"
+            self.last_error = str(exc)
+            # Retry later instead of freezing on mock for the process lifetime:
+            # a user may start `ollama serve` after the rig is already running.
+            self._backend_resolved = False
+            self._down_until = time.monotonic() + float(self.cfg.llm_retry_after_s)
+        return self.backend
+
+    def reset_backend(self) -> None:
+        """Forget a cached engine (used after ``ollama serve`` starts)."""
+        self.backend = self._injected_backend
+        self._backend_resolved = self._injected_backend is not None
+        self._down_until = 0.0
+        self.backend_name = self.backend.name if self.backend else "mock"
 
     # ------------------------------------------------------------------- task
     @staticmethod
@@ -95,14 +162,83 @@ class LlamaCppModel:
             total += -np.log(p[self._true_label(f)] + 1e-9)
         return float(total / len(features))
 
+    # ------------------------------------------------------------ adapter -> prompt
+    def steer(self, feature: Optional[np.ndarray]) -> dict:
+        """Turn the evolved adapter into sampling parameters.
+
+        The adapter cannot be merged into a frozen GGUF over HTTP, so it acts
+        as a *controller*: its winning salience lane and its activation
+        intensity set the temperature and the tone directive. The link between
+        evolution and output is therefore real, not decorative - and it is
+        documented as a controller, not a weight merge.
+        """
+        base_temp = float(self.cfg.llm_temperature)
+        if feature is None:
+            return {"salience": 1, "intensity": 0.0, "temperature": base_temp}
+        logits = self._probe(feature)
+        shifted = logits - logits.max()
+        probs = np.exp(shifted)
+        probs = probs / max(float(probs.sum()), 1e-9)
+        intensity = float(min(1.0, abs(logits).mean()))
+        temperature = float(np.clip(base_temp * (0.6 + 0.8 * intensity), 0.05, 1.5))
+        return {
+            "salience": int(np.argmax(probs)) + 1,
+            "intensity": intensity,
+            "temperature": temperature,
+            "confidence": float(probs.max()),
+        }
+
+    def compose_prompt(self, prompt: str, task: str, agent: str,
+                       steer: dict) -> str:
+        """Build the single string every backend receives."""
+        body = (task or "").strip()[:400] or "respond to the user"
+        lines = [
+            prompt.strip(),
+            f"Agent: {agent}.",
+            f"Task: {body}.",
+            (f"Tone: salience lane {steer['salience']} of 4, "
+             f"intensity {steer['intensity']:.2f}."),
+            (f"Reply in at most {max(1, self.cfg.output_lines - 1)} short lines. "
+             "Never show reasoning, plans, or system text."),
+        ]
+        return "\n".join(line for line in lines if line)
+
     # ------------------------------------------------------------- generation
     def generate(self, prompt: str, feature: Optional[np.ndarray] = None,
                  agent: str = "WHITE", task: str = "") -> Generation:
-        if not self.mock:
-            out = self.base(prompt, max_tokens=128)  # pragma: no cover
-            text = out["choices"][0]["text"].strip()
-            return Generation(text=text, tokens=len(text.split()), mock=False)
+        steer = self.steer(feature)
+        backend = self._select_backend()
 
+        if backend is not None and time.monotonic() < self._down_until:
+            backend = None  # recently failed; stay on mock until the cooldown ends
+
+        if backend is not None:
+            try:
+                reply: BackendReply = backend.complete(
+                    self.compose_prompt(prompt, task, agent, steer),
+                    max_tokens=int(self.cfg.llm_max_tokens),
+                    temperature=steer["temperature"],
+                    stop=["\n\n\n"],
+                )
+                text = self._clean(reply.text, agent=agent)
+                if text:
+                    self._last_degraded = False
+                    return Generation(text=text, tokens=reply.tokens,
+                                      mock=False, backend=reply.backend)
+                raise BackendError(f"{backend.name}: empty text after cleanup")
+            except BackendError as exc:
+                self.last_error = str(exc)
+                self.fallback_events += 1
+                self._down_until = time.monotonic() + float(self.cfg.llm_retry_after_s)
+                if not self.cfg.llm_fallback_mock:
+                    raise
+
+        self._last_degraded = self._wants_real_engine
+        return self._mock_generate(feature, task,
+                                   degraded=self._last_degraded)
+
+    def _mock_generate(self, feature: Optional[np.ndarray], task: str,
+                       degraded: bool = False) -> Generation:
         chosen = 0
         if feature is not None:
             chosen = int(np.argmax(self._probe(feature)))
@@ -110,11 +246,46 @@ class LlamaCppModel:
         lines = [
             f"I hear: {task_line}.",
             f"Routing through this path; salience {chosen + 1} of 4.",
-            f"Holding steady, attending to what matters here.",
+            "Holding steady, attending to what matters here.",
             "Ready for the next step whenever you are.",
         ]
         text = "\n".join(lines)
-        return Generation(text=text, tokens=len(text.split()), mock=True)
+        return Generation(text=text, tokens=len(text.split()), mock=True,
+                          backend="mock", degraded=degraded)
+
+    @staticmethod
+    def _clean(text: str, agent: str = "") -> str:
+        """Normalise model output for the 5-line harness format."""
+        out: List[str] = []
+        for raw in text.replace("\r", "").splitlines():
+            line = raw.strip()
+            if line[:2] in {"- ", "* ", "• "}:
+                line = line[2:].strip()
+            if not line:
+                continue
+            lowered = line.lower()
+            for prefix in ("zoe:", "assistant:", "answer:"):
+                if lowered.startswith(prefix):
+                    line = line[len(prefix):].strip()
+                    break
+            if line:
+                out.append(line)
+        # Models often echo the routing label back ("YELLOW."); the harness
+        # already prints it as the header, so drop the duplicate.
+        if out and agent and out[0].strip(" .:!-").lower() == agent.lower():
+            out = out[1:]
+        # One long paragraph is a common small-model answer; split it into
+        # sentences so the mandatory 5-line format has something to show.
+        if len(out) < 3:
+            expanded: List[str] = []
+            for line in out:
+                expanded.extend(
+                    part.strip()
+                    for part in re.split(r"(?<=[.!?])\s+", line)
+                    if part.strip()
+                )
+            out = expanded
+        return "\n".join(out)
 
     # --------------------------------------------------------------- evolution
     def temporal_noise(self, accuracy: float, generation: Optional[int] = None) -> float:

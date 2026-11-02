@@ -67,6 +67,25 @@ class ZoeConfig:
     noise_mu0: float = 0.1
     noise_lambda: float = 0.05
 
+    # --- L3 inference backend (desktop / Termux) -----------------------------
+    # "mock" (deterministic, no model) | "ollama" | "llama-server" |
+    # "llamacpp" | "llama-cli" | "auto" (first engine that answers).
+    llm_backend: str = "mock"
+    ollama_host: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen2.5:0.5b"
+    ollama_keep_alive: str = "5m"
+    llama_server_url: str = "http://127.0.0.1:8080"
+    llama_server_model: str = "zoe"
+    llama_cli_binary: str = "llama-cli"
+    llama_cli_args: str = ""
+    llm_threads: int = 0  # 0 = let the engine decide
+    llm_timeout_s: float = 120.0
+    llm_probe_timeout_s: float = 1.5
+    llm_retry_after_s: float = 30.0
+    llm_temperature: float = 0.7
+    llm_max_tokens: int = 128
+    llm_fallback_mock: bool = True
+
     # --- L4 Kali + Dunce (FR-4.x, FR-5.x) ------------------------------------
     kali_learning: int = 10
     kali_audit: int = 3

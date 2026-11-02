@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zoe"
-version = "4.0.0"
-description = "Project Zoe - a connectome-based reservoir computing companion with biologically-inspired control layers, an evolving LoRA adapter, a virtual avatar, a sandboxed MicroVM, and companion mode."
+version = "4.1.0"
+description = "Project Zoe - a connectome-based reservoir computing companion with biologically-inspired control layers, an evolving LoRA adapter, a virtual avatar, a sandboxed MicroVM, and companion mode. Runs on desktop and Termux via Ollama or llama.cpp."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "karun99", email = "karun99@users.noreply.github.com" }]
-keywords = ["agentic-ai", "reservoir-computing", "connectome", "lora", "companion", "mcp", "neuromorphic"]
+keywords = ["agentic-ai", "reservoir-computing", "connectome", "lora", "companion", "mcp", "neuromorphic", "termux", "ollama", "llama.cpp"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -22,6 +22,11 @@ dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 llm = ["llama-cpp-python>=0.2.0"]
+llamacpp = ["llama-cpp-python>=0.2.0"]
+# Ollama and llama-server are spoken to over plain HTTP (urllib): no dependency.
+ollama = []
+# Termux needs python + python-numpy from pkg; see docs/TERMUX.md.
+termux = []
 flybrain = ["flybrain"]
 companion = ["mss", "pytesseract"]
 api = ["fastapi", "uvicorn"]

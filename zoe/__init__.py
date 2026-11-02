@@ -15,11 +15,23 @@ Conceptual / metaphorical layers (Shatkona, Kundalini-as-layer, Sri Chakra as
 literal architecture, 80B scaling) are explicitly *not* implemented as literal
 architecture. Kundalini is implemented only as reflex arcs + reinforcement +
 neuromodulation on top of the L1 reservoir.
+
+``ZoeRig`` is resolved lazily so that lightweight tools (``zoe doctor``,
+``zoe backends``) still run on a machine where NumPy is missing or broken.
 """
 
 from .config import ZoeConfig
 from .identity import IDENTITY, identity_card
-from .rig import ZoeRig
 from .version import __version__
 
 __all__ = ["ZoeConfig", "ZoeRig", "IDENTITY", "identity_card", "__version__"]
+
+
+def __getattr__(name: str):
+    """PEP 562 lazy attribute - keeps ``import zoe`` free of NumPy."""
+    if name == "ZoeRig":
+        from .rig import ZoeRig
+
+        globals()["ZoeRig"] = ZoeRig
+        return ZoeRig
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

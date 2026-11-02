@@ -48,6 +48,8 @@ class RunResult:
     generation_text: str = ""
     frames: int = 0
     e2e_latency_s: float = 0.0
+    backend: str = "mock"
+    mock: bool = True
 
 
 class ZoeRig:
@@ -90,7 +92,11 @@ class ZoeRig:
     # ------------------------------------------------------ 13-step execution
     def run(self, input_text: str, novelty: Optional[float] = None) -> RunResult:
         started = time.perf_counter()
-        self.ledger.record("run.start", input=input_text[:200])
+        # Redact before persisting: the ledger is an on-disk append-only file,
+        # so secrets in the raw input must never reach it (FR-C.3).
+        self.ledger.record(
+            "run.start", input=self.companion.redact(input_text[:200])
+        )
 
         # 1 input arrives  |  2 AI VM session  |  3 companion observes
         self.sahaja.witness("input", text=input_text[:120])
@@ -130,6 +136,15 @@ class ZoeRig:
         # 12 avatar renders output with expression
         self.avatar.set_agent(decision.agent)
         lines = self.harness.format_response(decision.agent, gen.text)
+        # Enforce Jataka precepts + silent-thinking on the emitted text
+        # (FR-2.8). guard() records a jataka.block ledger event and drives the
+        # violation counters, so M-5.1 / M-2.8 measure a real gate rather than
+        # passing vacuously.
+        body = " ".join(lines[1:])
+        if not self.harness.guard(body):
+            lines = self.harness.format_response(
+                decision.agent, self.jataka.repair(body)
+            )
         frames = self.avatar.speak(" ".join(lines).split())
 
         # 13 snapshot state for next session
@@ -148,6 +163,8 @@ class ZoeRig:
             generation_text=gen.text,
             frames=len(frames),
             e2e_latency_s=elapsed,
+            backend=gen.backend,
+            mock=gen.mock,
         )
 
     # ------------------------------------------------------------- evolution
@@ -295,7 +312,10 @@ class ZoeRig:
                 "task_accuracy": held_acc,
                 "peak_memory_mb": _peak_memory_mb(),
                 "format_compliance": 1.0 if len(result.output_lines) == self.cfg.output_lines else 0.0,
-                "silent_thinking_violations": self.ledger.count("jataka.block"),
+                "silent_thinking_violations": (
+                    self.ledger.count("silent_thinking.block")
+                    + self.ledger.count("jataka.block")
+                ),
                 "routing_accuracy": self.benchmark_routing(),
                 "misroute_rate": 1.0 - self.benchmark_routing(),
                 "routing_latency_ms": 5.0,

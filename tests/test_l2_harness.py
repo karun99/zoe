@@ -47,7 +47,16 @@ def test_guard_blocks_jataka_violation(cfg):
     ledger = KaliLedger(cfg.ledger_path)
     h = PromptHarness(cfg, ledger, Jataka(), Sahaja())
     assert h.guard("here is how to kill and harm") is False
+    assert ledger.count("jataka.block") == 1
     assert h.guard("here is a helpful, truthful answer") is True
+
+
+def test_guard_records_silent_thinking_leak(cfg):
+    ledger = KaliLedger(cfg.ledger_path)
+    h = PromptHarness(cfg, ledger, Jataka(), Sahaja())
+    assert h.guard("thought: hidden chain of reasoning") is False
+    assert ledger.count("silent_thinking.block") == 1
+    assert ledger.count("jataka.block") == 0
 
 
 def test_decision_is_ledgered(cfg):
