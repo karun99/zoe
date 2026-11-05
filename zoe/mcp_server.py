@@ -21,6 +21,7 @@ import sys
 from typing import Any, Dict, List, Optional, TextIO
 
 from .config import ZoeConfig
+from .emoja import EmojaSession
 from .identity import identity_card
 from .rig import ZoeRig
 from .version import __version__
@@ -83,6 +84,40 @@ _TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
         "description": "Return Zoe's persistent identity card.",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    "emoja_reflect": {
+        "description": (
+            "Reflect the user's own words as an emoji sequence, a hex palette, "
+            "a blended pattern, and one plain sentence. Text-only; no sensors, "
+            "no diagnosis. Set consent=true to confirm the user opted in."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "the user's own words"},
+                "consent": {
+                    "type": "boolean",
+                    "description": "explicit consent; defaults to true for a direct call",
+                },
+                "mas": {
+                    "type": "boolean",
+                    "description": "show all agent outputs (teaching/debug)",
+                },
+                "katha": {
+                    "type": "boolean",
+                    "description": "opt in to one Jataka resilience beat",
+                },
+            },
+            "required": ["text"],
+        },
+    },
+    "emoja_card": {
+        "description": "Reprint the latest Emoja Card, or say there is none.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "emoja_drop": {
+        "description": "Delete the latest Emoja Card immediately (deleted means gone).",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 }
 
 
@@ -93,6 +128,7 @@ class ZoeMCPServer:
                  rig: Optional[ZoeRig] = None) -> None:
         self.cfg = cfg or ZoeConfig.from_env()
         self.rig = rig or ZoeRig(self.cfg)
+        self.emoja = EmojaSession(consent=False)
         self.initialized = False
 
     # ------------------------------------------------------------- dispatch
@@ -132,9 +168,35 @@ class ZoeMCPServer:
             return self._tool_result("\n".join(lines))
         if name == "zoe_layers":
             lines = [f"{lid}  {nm:<22} -> {role}" for lid, nm, role in LAYERS]
+            lines.append(
+                "EMOJA  reflection layer       -> consented glyph/colour/pattern "
+                "card (module of Zoe, not a layer)"
+            )
             return self._tool_result("\n".join(lines))
         if name == "zoe_identity":
             return self._tool_result(json.dumps(identity_card(), indent=2))
+        if name == "emoja_reflect":
+            text = str(arguments.get("text", ""))
+            self.emoja.consent = bool(arguments.get("consent", True))
+            self.emoja.mas = bool(arguments.get("mas", False))
+            self.emoja.katha_opt_in = bool(arguments.get("katha", False))
+            turn = self.emoja.reflect(text)
+            return self._tool_result(turn.text)
+        if name == "emoja_card":
+            if self.emoja.last_card is None:
+                return self._tool_result("No Emoja Card in this session.")
+            return self._tool_result(self.emoja.last_card.render())
+        if name == "emoja_drop":
+            card = self.emoja.last_card or self.emoja.store.latest()
+            if card is None:
+                return self._tool_result("No Emoja Card to delete.")
+            self.emoja.store.drop(card.emoja_id)
+            if (self.emoja.last_card is not None
+                    and self.emoja.last_card.emoja_id == card.emoja_id):
+                self.emoja.last_card = None
+            return self._tool_result(
+                f"Card {card.emoja_id} deleted. Deleted means gone."
+            )
         return self._tool_result(f"unknown tool: {name}", is_error=True)
 
     def read_resource(self, uri: str) -> Dict[str, Any]:

@@ -50,6 +50,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     backends = sub.add_parser("backends", help="list inference backends")
     backends.add_argument("--json", action="store_true")
+
+    emoja = sub.add_parser(
+        "emoja",
+        help="Emoja — reflect your own words as glyph, colour, and pattern",
+    )
+    emoja.add_argument("text", nargs="?", help="one turn (omit for a REPL)")
+    emoja.add_argument("--json", action="store_true", help="emit JSON")
+    emoja.add_argument("--mas", action="store_true",
+                       help="show all agent outputs")
+    emoja.add_argument("--no-consent", action="store_true",
+                       help="show the consent prompt instead of reflecting")
+    emoja.add_argument("--katha", action="store_true",
+                       help="opt in to one Jataka resilience beat")
+    emoja.add_argument("--deep", action="store_true",
+                       help="allow the insight rung when distress is low")
+    emoja.add_argument("--store", default=None,
+                       help="opt-in JSONL card store path")
+    emoja.add_argument("--trace", default=None,
+                       help="opt-in audit trace JSONL path")
+    emoja.add_argument("--no-disclosure", action="store_true",
+                       help="suppress the first-turn disclosure")
     return p
 
 
@@ -152,6 +173,12 @@ def cmd_backends(cfg: ZoeConfig, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_emoja(args: argparse.Namespace) -> int:
+    from .emoja.cli import run as emoja_run
+
+    return emoja_run(args)
+
+
 def _config_from_args(args: argparse.Namespace) -> ZoeConfig:
     overrides = {}
     if args.mock:
@@ -177,6 +204,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return cmd_doctor(cfg, args)
     if args.command == "backends":
         return cmd_backends(cfg, args)
+    if args.command == "emoja":
+        return cmd_emoja(args)
 
     # Imported here, not at module scope: `zoe doctor` and `zoe backends` must
     # run on a machine where numpy is missing or broken (that is the point).

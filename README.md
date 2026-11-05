@@ -4,11 +4,15 @@
 
 **A connectome-based reservoir computing companion** with biologically-inspired
 control layers, an evolving LoRA adapter, embodied through a virtual avatar,
-sandboxed in a MicroVM, with companion mode.
+sandboxed in a MicroVM, with companion mode — and **Emoja**, its consented,
+non-diagnostic reflection layer.
 
 > **Honest claim.** Zoe is a connectome-based reservoir computing system with
 > biologically-inspired control layers, an evolving LoRA adapter, embodied
 > through a virtual avatar, sandboxed in a MicroVM, with companion mode.
+> Emoja is the reflection layer on top: Zoe's reservoir/LoRA layers evolve
+> underneath, Emoja reflects safely on top. It is **not** therapy, emotion
+> detection, or a diagnostic tool.
 > Zoe is **not** a superintelligence, and the conceptual layers (Shatkona,
 > Kundalini‑as‑a‑layer, Sri Chakra as literal architecture, 80B scaling) are
 > implemented only as metaphor or inspiration — never as literal architecture.
@@ -31,6 +35,7 @@ L8  Companion Mode        → screen/browser awareness + pet states
 L9  Sahaja                → silent witness (never acts)
 L10 Jataka                → karmic guardrails (5 precepts)
 L11 PIA                   → silent adaptation
+EMOJA Reflection layer    → consented glyph · colour · pattern · one sentence
 ```
 
 ## Quick start
@@ -45,6 +50,7 @@ python -m zoe demo          # short scripted demonstration
 python -m zoe run "build and implement a plan to fix the code"
 python -m zoe train --generations 200
 python -m zoe report        # evolution + 7-tier evaluation
+python -m zoe emoja "I felt tired after the meeting but I am steady now"
 ```
 
 ### With a real local model
@@ -128,6 +134,50 @@ Every interaction (`ZoeRig.run`) walks the SRS execution flow:
 | 12 | Avatar renders output with expression | L6 `Avatar` |
 | 13 | VM snapshots state for next session | L7 |
 
+## Emoja — the reflection layer
+
+[Emoja](docs/EMOJA.md) is Zoe's consented, non-diagnostic reflection layer. It
+is a module of Zoe, not a second project: Zoe's reservoir/LoRA layers evolve
+underneath, Emoja reflects on top. It takes **only the user's own words** and
+returns a compact card — an emoji sequence, a hex palette, a pattern described
+in words, a Shatkona balance check, and one plain sentence.
+
+```console
+$ python -m zoe emoja "I feel a little sad."
+Emoja Card · em-4ddcb0a4
+words: "I feel a little sad."
+cluster: sad
+emoji: 🌧️ 💧 🫂 🌱   anchor: 💧
+palette: #005d94 / #4f9ee4 / #004d58 / #f8ece0   contrast: PASS
+pattern: a narrow band, low saturation, high confidence | intensity 0.20 | steady
+shatkona: ground 0.50 ↔ aspire 0.50 | hold 0.50 ↔ release 0.50 | see 0.00 ↔ feel 1.00 → mostly feeling, little seeing
+kundalini_max: will   integration: done
+jataka: not-run
+audit: emoja-13d93ece2aae
+sentence: "This reads as sad, mostly feeling, little seeing."
+```
+
+The trust boundary is explicit: **SUNO** is the only agent that sees the raw
+turn; every other agent receives SUNO's typed reading. **DRISHTI** holds a real
+veto — a veto prevents SETU from assembling aesthetic output. High distress
+drops colour/emoji/pattern; crisis drops the card entirely and responds plainly.
+
+```bash
+python -m zoe emoja                       # interactive session
+python -m zoe emoja --mas "..."           # show every agent (teaching/debug)
+python -m zoe emoja --json "..."          # machine-readable card
+python -m zoe emoja --katha --trace trace.jsonl "..."
+```
+
+Commands include `/card`, `/save`, `/drop`, `/pause`, `/ground`, `/crisis`,
+`/mas on|off`, and `/katha on|off`. The self-check is implemented as tests
+T1–T8 (`pytest tests/emoja -q`); the honest per-directive enforcement table is
+in [`docs/ENFORCEMENT.md`](docs/ENFORCEMENT.md). Emoja is **not** therapy,
+emotion detection, or a diagnostic tool, and it never reads faces, voices,
+biosignals, or keystrokes.
+
+---
+
 ## Architecture
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the layer diagram and the
@@ -178,14 +228,17 @@ measures exactly what it did before. It is a controller, not a weight merge.
 Zoe ships its **own Model Context Protocol server** (L5), so an editor or another
 agent can drive the rig. It speaks newline-delimited JSON-RPC over **stdio**
 (`initialize` / `tools/list` / `tools/call`, `resources/list` / `resources/read`),
-is dependency-free, and exposes four tools plus an identity resource:
+is dependency-free, and exposes seven tools plus an identity resource:
 
 | Tool | Purpose |
 |---|---|
 | `zoe_run` | Run one 13-step interaction; returns her answer, routed agent and growth signal |
 | `zoe_report` | Run the evolution loop + 7-tier evaluation; returns the pass/fail summary |
-| `zoe_layers` | List the eleven layers and their roles |
+| `zoe_layers` | List the eleven layers, their roles, and the Emoja module |
 | `zoe_identity` | Return Zoe's persistent identity card |
+| `emoja_reflect` | Reflect the user's own words as a consented Emoja Card |
+| `emoja_card` | Reprint the latest Emoja Card |
+| `emoja_drop` | Delete the latest Emoja Card (deleted means gone) |
 
 ```bash
 zoe-mcp                      # or: python -m zoe.mcp_server
@@ -224,11 +277,14 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-103 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
+106 tests cover all 11 layers, the 9-agent conflict matrix, the Kali phase
 cycle, Dunce patching, MCP client + server (stdio JSON-RPC), the Prompt API,
 VM isolation & egress, companion redaction, the 7-tier evaluation harness, the
 inference backends (Ollama, llama-server, llama-cli, mock fallback) against a
 local stub server, `zoe doctor`, the premortem detectors, and the integrated rig.
+Nine additional tests cover Emoja: eight self-check tests T1–T8
+(`tests/emoja/`) plus an MCP reflect/card/drop round-trip. The full suite is
+**115 tests**.
 
 ## Premortem guardrails
 
@@ -274,6 +330,11 @@ any of these shows up as a tagged `[§n]` line rather than a silent failure.
 * **Conceptual layers.** L9/L11 and the “+ peripheral awareness” and
   “+ thought blend” mechanisms are implemented as control logic, in line with
   the SRS scope table.
+* **Emoja’s real-backend run is pending.** T1–T8 pass on the deterministic
+  text-only pipeline; a logged Ollama run has not been recorded. D1 guided
+  mutation (Dunce < 0.20) is not implemented, and D4 user interviews have not
+  started. See [`docs/ENFORCEMENT.md`](docs/ENFORCEMENT.md) for the honest
+  per-directive table.
 
 ## License
 

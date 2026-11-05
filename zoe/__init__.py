@@ -2,7 +2,9 @@
 
 Zoe (from Greek zoe, "life") is a connectome-based reservoir computing system
 with biologically-inspired control layers, an evolving LoRA adapter, embodied
-through a virtual avatar, sandboxed in a MicroVM, with companion mode.
+through a virtual avatar, sandboxed in a MicroVM, with companion mode. Emoja is
+its consented, non-diagnostic reflection layer: Zoe's reservoir/LoRA layers
+evolve underneath, Emoja reflects safely on top.
 
 The honest claim (SRS v4.0):
 
@@ -21,10 +23,12 @@ neuromodulation on top of the L1 reservoir.
 """
 
 from .config import ZoeConfig
+from .emoja import EmojaSession
 from .identity import IDENTITY, identity_card
 from .version import __version__
 
-__all__ = ["ZoeConfig", "ZoeRig", "IDENTITY", "identity_card", "__version__"]
+__all__ = ["ZoeConfig", "ZoeRig", "IDENTITY", "identity_card", "EmojaSession",
+           "__version__"]
 
 
 def __getattr__(name: str):

@@ -23,7 +23,7 @@ pip install -e ".[dev]"
 ## Running the tests
 
 ```bash
-pytest -q                 # the full suite (103 tests)
+pytest -q                 # the full suite (115 tests)
 python -m zoe report      # the 7-tier evaluation harness
 ```
 

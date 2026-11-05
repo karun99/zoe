@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zoe"
-version = "4.1.0"
-description = "Project Zoe - a connectome-based reservoir computing companion with biologically-inspired control layers, an evolving LoRA adapter, a virtual avatar, a sandboxed MicroVM, and companion mode. Runs on desktop and Termux via Ollama or llama.cpp."
+version = "4.2.0"
+description = "Project Zoe - a connectome-based reservoir computing companion with biologically-inspired control layers, an evolving LoRA adapter, a virtual avatar, a sandboxed MicroVM, companion mode, and Emoja, its consented non-diagnostic reflection layer. Runs on desktop and Termux via Ollama or llama.cpp."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "karun99", email = "karun99@users.noreply.github.com" }]
-keywords = ["agentic-ai", "reservoir-computing", "connectome", "lora", "companion", "mcp", "neuromorphic", "termux", "ollama", "llama.cpp"]
+keywords = ["agentic-ai", "reservoir-computing", "connectome", "lora", "companion", "mcp", "neuromorphic", "termux", "ollama", "llama.cpp", "emoja", "reflection", "consent", "neurodivergent"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -35,6 +35,7 @@ dev = ["pytest>=7.0", "pytest-cov"]
 [project.scripts]
 zoe = "zoe.cli:main"
 zoe-mcp = "zoe.mcp_server:main"
+zoe-emoja = "zoe.emoja.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["zoe*"]

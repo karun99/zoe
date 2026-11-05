@@ -33,7 +33,10 @@ def test_tools_list(cfg):
     s = _server(cfg)
     tools = s.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/list"})["result"]["tools"]
     names = {t["name"] for t in tools}
-    assert names == {"zoe_run", "zoe_report", "zoe_layers", "zoe_identity"}
+    assert names == {
+        "zoe_run", "zoe_report", "zoe_layers", "zoe_identity",
+        "emoja_reflect", "emoja_card", "emoja_drop",
+    }
     for t in tools:
         assert t["inputSchema"]["type"] == "object"
 
@@ -55,6 +58,7 @@ def test_call_zoe_layers(cfg):
     text = resp["result"]["content"][0]["text"]
     assert len(LAYERS) == 11
     assert "L1" in text and "L11" in text
+    assert "EMOJA" in text
 
 
 def test_call_zoe_identity(cfg):
@@ -120,3 +124,27 @@ def test_report_small(cfg):
                                 "arguments": {"generations": 5}}})
     text = resp["result"]["content"][0]["text"]
     assert "scored=" in text and "critical_five_ok=" in text
+
+
+def test_emoja_reflect_card_drop(cfg):
+    s = _server(cfg)
+    resp = s.handle({"jsonrpc": "2.0", "id": 13, "method": "tools/call",
+                     "params": {"name": "emoja_reflect",
+                                "arguments": {"text": "I feel a little sad.",
+                                              "consent": True}}})
+    text = resp["result"]["content"][0]["text"]
+    assert "Emoja Card" in text
+    assert "cluster: sad" in text
+    assert "sentence:" in text and "audit:" in text
+    assert resp["result"]["isError"] is False
+
+    card = s.handle({"jsonrpc": "2.0", "id": 14, "method": "tools/call",
+                     "params": {"name": "emoja_card", "arguments": {}}})
+    assert "Emoja Card" in card["result"]["content"][0]["text"]
+
+    dropped = s.handle({"jsonrpc": "2.0", "id": 15, "method": "tools/call",
+                        "params": {"name": "emoja_drop", "arguments": {}}})
+    assert "deleted" in dropped["result"]["content"][0]["text"].lower()
+    after = s.handle({"jsonrpc": "2.0", "id": 16, "method": "tools/call",
+                      "params": {"name": "emoja_card", "arguments": {}}})
+    assert "No Emoja Card" in after["result"]["content"][0]["text"]

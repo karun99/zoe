@@ -34,13 +34,25 @@ AI Virtual Machine, and Companion Mode for screen/browser awareness.
 | L11 | PIA Adaptation | 🟡 Conceptual |
 | + | Peripheral Awareness | 🟡 Conceptual |
 | + | Thought Blend | 🟡 Conceptual |
+| EMOJA | Reflection layer (module, not an L-numbered layer) | 🟢 Real (deterministic text-only pipeline) |
 
 Conceptual/metaphorical (not implementable as literal architecture): Shatkona,
 Kundalini (as a layer), Sri Chakra.
 
+**Emoja scope boundary.** Emoja is a **module of Zoe**, not a second project and
+not an L-numbered layer. Zoe is the reservoir/LoRA/evolution stack underneath;
+Emoja is the consented reflection layer on top. It reads only the user's own
+text. It is not therapy, emotion detection, or a diagnostic tool. The Shatkona
+balance check and the Kundalini depth ladder are used inside Emoja as a numeric
+balance check and a **symbolic permission scale** respectively — never as
+metaphysical claims.
+
 ### 1.3 Definitions
 Zoe · Neural Harness · Rig · Kali · Dunce · Sahaja · Jataka · PIA · MCP ·
-Temporal Noise Reduction · Companion Mode (see glossary in code docstrings).
+Temporal Noise Reduction · Companion Mode · Emoja · SUNO · DRISHTI · MUDRA ·
+RANG · BINDU · KATHA · SETU · Emoja Card · Shatkona balance check · Kundalini
+depth ladder (symbolic) · integration rung (see glossary in code docstrings and
+[`EMOJA.md`](EMOJA.md)).
 
 ### 1.4 Identity
 Zoe is a living companion that observes without intruding, learns without
@@ -71,7 +83,8 @@ and evolves without losing itself. Zoe is a presence, not a tool.
 Self-contained evolving companion using a real biological connectome as substrate,
 evolving a lightweight adapter, regulated by a prompt harness, discovering tools
 via MCP, embodied via avatar, sandboxed in a MicroVM, aware via companion mode,
-growing capacity in response to learning demand.
+growing capacity in response to learning demand · consented, non-diagnostic
+text reflection (Emoja).
 
 ### 2.2 Product functions
 Pattern detection · agent routing · output regulation · evolution · temporal
@@ -231,12 +244,53 @@ VIOLET serene/loving · BLACK still/flat · WHITE balanced/harmonious.
 
 States: idle · curious · focused · playful · resting.
 
+### 4.9 EMOJA Reflection Layer (module of Zoe)
+
+Emoja is the user-facing reflection layer. It returns a compact Emoja Card: a
+3–5 emoji sequence with an anchor, a 3–5 token hex palette blended in OKLCH, a
+pattern described in words, a Shatkona balance check, a symbolic Kundalini max
+rung, an audit trace id, and exactly one plain reflection sentence.
+
+**Trust boundary.** `SUNO` is the sole raw-text input. `DRISHTI` consumes SUNO's
+typed reading (never a second raw-text path), holds an **enforced** veto over
+aesthetic output, and sets the max rung. `MUDRA`, `RANG`, and `BINDU` receive
+only SUNO's typed cluster; `KATHA` is optional; `SETU` assembles the card.
+
+| Req | Requirement | Priority |
+|---|---|---|
+| FR-E.1 | Reflect only self-expressed text; no face/voice/biosignal input | Critical |
+| FR-E.2 | SUNO is the sole raw-text input to all other agents | Critical |
+| FR-E.3 | DRISHTI veto blocks aesthetic assembly in SETU (enforced, not advisory) | Critical |
+| FR-E.4 | High distress drops emoji/palette/pattern; plain response only | Critical |
+| FR-E.5 | Crisis trigger kills aesthetics, emits no card and no trace write | Critical |
+| FR-E.6 | Shatkona axes scored 0–1; skew > 0.4 named in the sentence | High |
+| FR-E.7 | Kundalini max rung set per turn; no agent may exceed it | High |
+| FR-E.8 | Exactly one plain reflection sentence; "this reads as", not "you are" | Critical |
+| FR-E.9 | Integration rung (return to ground) always runs before close | Critical |
+| FR-E.10 | `/card`, `/save`, `/drop`, `/pause`, `/ground`, `/crisis` transparency controls | Critical |
+| FR-E.11 | Card `audit` field links input → agents composed → output | High |
+| FR-E.12 | Self-check implemented as tests T1–T8 | High |
+| FR-E.13 | Consent required before a card exists; default session consent is false | Critical |
+
+**Enforcement status.** P1–P5 are enforced in code; P6 (no diagnosis) is
+PARTIAL (T6 regex catches known patterns only); crisis "retain nothing" remains
+ASPIRATIONAL until a production deletion audit. See
+[`ENFORCEMENT.md`](ENFORCEMENT.md) for the per-directive table. D1 guided
+mutation (Dunce < 0.20), D2's real-Ollama run, and D4 user interviews are **not**
+claimed as complete.
+
+**Surfaces.** `zoe emoja "…"` / `zoe-emoja` (one-shot, `--json`, `--mas`,
+`--katha`, `--deep`, `--store`, `--trace`), an interactive REPL, and the MCP
+tools `emoja_reflect`, `emoja_card`, `emoja_drop`.
+
 ## 5. External interfaces
 User (CLI, avatar UI, 5-line output, tray indicator) · hardware (CPU, RAM, GPU,
 camera/mic) · software (Python ≥3.10, numpy, Ollama or llama.cpp
 (`llama-cpp-python` / `llama-server` / `llama-cli`), flybrain, mss,
 pytesseract, Firecracker) · communication (MCP stdio JSON-RPC, Prompt API
-HTTP/REST, avatar WebSocket, VM gRPC/REST).
+HTTP/REST, avatar WebSocket, VM gRPC/REST) · Emoja surfaces (`zoe emoja` CLI,
+`zoe-emoja`, MCP `emoja_reflect` / `emoja_card` / `emoja_drop`; text in, card +
+one sentence out; opt-in JSONL store and audit trace).
 
 ## 6. Non-functional requirements
 
