@@ -35,8 +35,9 @@ cd zoe
 bash scripts/termux-install.sh
 ```
 
-The script installs `python`, `python-numpy`, build tools and Ollama, creates a
-virtualenv at `~/.zoe/venv`, writes `~/.zoe/env`, pulls `qwen2.5:0.5b`, and runs
+The script installs `python`, `python-numpy`, `curl`, `procps`, and (only when
+you choose the in-process backend) the compiler toolchain, creates a virtualenv
+at `~/.zoe/venv`, writes `~/.zoe/env`, pulls `qwen2.5:0.5b`, and runs
 `zoe doctor`.
 
 Then:
@@ -52,9 +53,16 @@ zoe run "build and implement a plan"
 ```bash
 bash scripts/termux-install.sh --model llama3.2:1b     # bigger, slower, better
 bash scripts/termux-install.sh --no-ollama             # mock engine only
+bash scripts/termux-install.sh --no-pull               # skip the model download
+bash scripts/termux-install.sh --dry-run               # print the env, change nothing
+bash scripts/termux-install.sh --backend llama-server \
+     --model-file ~/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 bash scripts/termux-install.sh --backend llama-cli \
      --model-file ~/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
+
+`--no-ollama` writes `ZOE_LLM_BACKEND=mock`; combine it with `--backend` only
+when you want to keep an engine that is already installed.
 
 ## Choosing a model
 
@@ -81,7 +89,7 @@ structure does not depend on the model being large.
 | `ollama` | HTTP `127.0.0.1:11434/api/chat` | **recommended** — `pkg install ollama` |
 | `llama-server` | HTTP `127.0.0.1:8080/v1/chat/completions` | `pkg install llama-cpp` |
 | `llama-cli` | subprocess per call | `pkg install llama-cpp`, no server needed |
-| `llamacpp` | in-process `llama-cpp-python` | needs clang; slow to build |
+| `llamacpp` | in-process `llama-cpp-python` | needs clang and a long build; avoid on a phone |
 | `mock` | deterministic, in-process | always available |
 | `auto` | first engine that answers | tries ollama → llama-server → llamacpp → llama-cli |
 
@@ -122,12 +130,15 @@ Every knob is a `ZOE_*` environment variable (`zoe/config.py`).
 ```bash
 bash scripts/termux-start.sh run "warn me about the unsafe risk here"
 bash scripts/termux-start.sh report
-bash scripts/termux-start.sh --stop        # stop engine, release wake lock
+bash scripts/termux-start.sh --stop        # stop the engine it started
 ```
 
 `termux-start.sh` takes a wake lock (`termux-wake-lock`) so Android does not
 freeze the engine when the screen turns off, starts Ollama/llama-server if
-needed, then runs Zoe.
+needed, then runs Zoe. The lock is released when Zoe exits; set
+`ZOE_KEEP_AWAKE=1` to keep it held for a long-lived session. `--stop` only kills
+the engine recorded in `~/.zoe/engine.pid`, not an Ollama daemon you started
+yourself.
 
 ### MCP server
 
@@ -195,6 +206,8 @@ merge — it is documented that way in `docs/ARCHITECTURE.md`.
 | symptom | fix |
 |---|---|
 | `numpy` fails to build | `pkg install python-numpy`; do not `pip install numpy` on Termux |
+| `curl: command not found` | re-run the installer, or `pkg install curl` |
+| `pkill: command not found` | `pkg install procps` (the installer does this) |
 | `ollama: cannot reach …` | `ollama serve` (or `bash scripts/termux-start.sh`) |
 | `model_present: false` | `ollama pull qwen2.5:0.5b` |
 | generation is very slow | smaller model, `ZOE_LLM_MAX_TOKENS=64`, keep-alive on |
@@ -203,6 +216,7 @@ merge — it is documented that way in `docs/ARCHITECTURE.md`.
 | `pkg` mirror timeouts | `termux-change-repo`, then retry |
 | `pkg` cannot find `ollama` / `llama-cpp` | `pkg install tur-repo`, then retry |
 | `llama-cli` flag errors | set `ZOE_LLAMA_CLI_ARGS` to your build's flags |
+| `--no-ollama` still tries Ollama | upgrade to this script version; it should write `ZOE_LLM_BACKEND=mock` |
 
 ## Uninstall
 
